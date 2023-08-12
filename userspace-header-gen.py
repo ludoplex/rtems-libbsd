@@ -76,22 +76,18 @@ class HeaderGenCU:
 
     def __init__(self, cu, progname, lineprog, err = sys.stderr, verbose = 0,
                  filterre = re.compile('.*')):
-        self._rtems_port_names = []
-        self._rtems_port_names.append("_Linker_set_bsd_prog_%s_begin" % progname)
-        self._rtems_port_names.append("_Linker_set_bsd_prog_%s_end" % progname)
-        self._rtems_port_names.append("rtems_bsd_command_%s" % progname)
-
-        self._filter_special_vars = []
-        # Take some special care for some yacc variables. This matches the yyval
-        # and yylval. These two always make trouble in the generated headers.
-        # yyval is initialized by Yacc generated code so it's not
-        # necessary to move them into the copy back region. yylval is used only
-        # for transporting a value. It will be set when used.
-        self._filter_special_vars.append({
-            "re":re.compile('extern YYSTYPE .*val'),
-            "reason":"Lex / Yacc variable initialized by generated code",
-            "action":"no_section"
-            })
+        self._rtems_port_names = [
+            f"_Linker_set_bsd_prog_{progname}_begin",
+            f"_Linker_set_bsd_prog_{progname}_end",
+            f"rtems_bsd_command_{progname}",
+        ]
+        self._filter_special_vars = [
+            {
+                "re": re.compile('extern YYSTYPE .*val'),
+                "reason": "Lex / Yacc variable initialized by generated code",
+                "action": "no_section",
+            }
+        ]
         # Lex generates an external variable that shouldn't be extern. Move it
         # to the current data header file.
         self._filter_special_vars.append({
@@ -107,7 +103,7 @@ class HeaderGenCU:
         self._die_by_offset = {}
         self._lineprogram = lineprog
         self._filterre = filterre
-        self._namespace_prefix = "_bsd_%s_" % (self._progname)
+        self._namespace_prefix = f"_bsd_{self._progname}_"
 
         self._fill_die_list()
 
@@ -138,7 +134,7 @@ class HeaderGenCU:
 
         if self._verbose >= VERBOSE_MOST:
             self._err.write('Search type for DIE with offset=%d\n' % \
-                            (die.offset))
+                                (die.offset))
 
         try:
             typedie_offset = die.attributes["DW_AT_type"].value
@@ -149,7 +145,7 @@ class HeaderGenCU:
             typedie = self._die_by_offset[typedie_offset]
         except KeyError:
             raise TypenameNotFoundError('Couldn\'t find the DIE at offset %d\n' % \
-                                        (typedie_offset))
+                                            (typedie_offset))
 
         last = False
         if (typedie.tag == "DW_TAG_const_type"):
@@ -167,7 +163,7 @@ class HeaderGenCU:
                             arraysize = "%d" % (upper_bound + 1)
                         except KeyError:
                             arraysize = ""
-                    typepost += "[%s]" % arraysize
+                    typepost += f"[{arraysize}]"
 
         elif (typedie.tag == "DW_TAG_volatile_type"):
             typepre += "volatile "
@@ -194,42 +190,36 @@ class HeaderGenCU:
             if current_child == 0:
                 typepost += "void"
             typepost += ")"
-            if not "DW_AT_type" in typedie.attributes.keys():
-                typepre = "void " + typepre
+            if "DW_AT_type" not in typedie.attributes.keys():
+                typepre = f"void {typepre}"
                 last = True
 
-        elif (typedie.tag == "DW_TAG_typedef") or \
-             (typedie.tag == "DW_TAG_base_type"):
-            # nothing to do here than prevent the error
-            pass
-
-        else:
+        elif typedie.tag not in ["DW_TAG_typedef", "DW_TAG_base_type"]:
             raise TypenameNotFoundError('Unknown tag: %s\n' % (typedie.tag))
 
-        if (typedie.tag == "DW_TAG_typedef") or \
-           (typedie.tag == "DW_TAG_base_type") or \
-           (typedie.tag == "DW_TAG_structure_type") or \
-           (typedie.tag == "DW_TAG_enumeration_type"):
+        if typedie.tag in [
+            "DW_TAG_typedef",
+            "DW_TAG_base_type",
+            "DW_TAG_structure_type",
+            "DW_TAG_enumeration_type",
+        ]:
             last = True
             try:
-                typepre += "%s " % \
-                          typedie.attributes["DW_AT_name"].value.decode('ascii')
+                typepre += f"""{typedie.attributes["DW_AT_name"].value.decode('ascii')} """
             except KeyError:
                 if typedie.has_children:
-                    message = 'Found an anonymous structure'
-                    raise AnonymousStructureError(message)
-                else:
-                    message = 'Couldn\'t get type name from DIE'
-                    raise TypenameNotFoundError(message)
+                    raise AnonymousStructureError('Found an anonymous structure')
+                message = 'Couldn\'t get type name from DIE'
+                raise TypenameNotFoundError(message)
 
-        if last == False:
+        if not last:
             addpre, addpost = self._get_type(typedie, first_array)
             typepre = addpre + typepre
             typepost = typepost + addpost
 
         if self._verbose >= VERBOSE_MOST:
             self._err.write('Add prefix="%s", postfix="%s" for DIE with offset=%d\n' % \
-                            (typepre, typepost, die.offset))
+                                (typepre, typepost, die.offset))
 
         return typepre, typepost
 
@@ -268,8 +258,7 @@ class HeaderGenCU:
             typedie = self._die_by_offset[type_offset]
         except KeyError:
             self._err.write("WARNING: Could not find out whether DIE %d is const.\n" % \
-                            die.offset)
-            pass
+                                die.offset)
         else:
             if typedie.tag == "DW_TAG_const_type":
                 is_constant = True
@@ -295,10 +284,10 @@ class HeaderGenCU:
                 # located elsewhere
                 try:
                     specification = child.attributes["DW_AT_specification"]\
-                                         .value
+                                             .value
                     specdie = self._die_by_offset[specification]
                     varname = specdie.attributes["DW_AT_name"].value\
-                                     .decode('ascii')
+                                         .decode('ascii')
                 except KeyError:
                     varname = None
 
@@ -307,11 +296,11 @@ class HeaderGenCU:
             if self._die_is_var(child):
                 if self._verbose >= VERBOSE_MORE:
                     self._err.write('Process variable DIE: tag=%s, name=%s\n' % \
-                                    (child.tag, varname))
+                                        (child.tag, varname))
             elif self._die_is_function(child):
                 if self._verbose >= VERBOSE_MORE:
                     self._err.write('Process function DIE: tag=%s, name=%s\n' % \
-                                    (child.tag, varname))
+                                        (child.tag, varname))
                 if varname is None:
                     if self._verbose >= VERBOSE_MORE:
                         self._err.write('Skip function with no name.\n')
@@ -320,7 +309,7 @@ class HeaderGenCU:
             else:
                 if self._verbose >= VERBOSE_MORE:
                     self._err.write('DIE is no variable or function: tag=%s, name=%s\n' % \
-                                    (child.tag, varname))
+                                        (child.tag, varname))
                     # FIXME: Check if this die has children and if one of the
                     # children is a function static variable
                 continue
@@ -328,7 +317,7 @@ class HeaderGenCU:
             # filter some special names that are used for porting
             if varname in self._rtems_port_names:
                 self._err.write('Skip %s. It is a special object for porting.\n' % \
-                                (varname))
+                                    (varname))
                 continue
 
             # check if it is an external variable
@@ -351,7 +340,7 @@ class HeaderGenCU:
             if is_decl and specdie == child:
                 if self._verbose >= VERBOSE_MORE:
                     self._err.write('Skip extern variable "%s" because it is only a declaration.\n' % \
-                    (varname))
+                        (varname))
                 continue
 
             # filter constants
@@ -377,12 +366,12 @@ class HeaderGenCU:
                 decl_line = child.attributes["DW_AT_decl_line"].value
             except KeyError:
                 decl_line = "<unknown>"
-            var_decl = "%s:%s" % (decl_file, decl_line)
+            var_decl = f"{decl_file}:{decl_line}"
 
             if self._filterre.match(decl_file) is None:
                 if self._verbose >= VERBOSE_SOME:
                     self._err.write('Skip variable "%s" because it\'s declaration file (%s) doesn\'t match the filter\n' % \
-                                    (varname, var_decl))
+                                        (varname, var_decl))
                 continue
 
             # get type for the variable
@@ -395,45 +384,44 @@ class HeaderGenCU:
                     raise
                 except AnonymousStructureError:
                     self._err.write('ERROR: anonymous structure "%s" at %s\n' % \
-                                    (varname, var_decl))
+                                        (varname, var_decl))
                     raise
-                var_with_type = "%s%s%s" % (typepre, varname, typepost)
+                var_with_type = f"{typepre}{varname}{typepost}"
 
                 # check if it is a static or a extern
                 if not is_extern:
-                    var_with_type = "static " + var_with_type
+                    var_with_type = f"static {var_with_type}"
                     out_items = data_out_items
                 else:
                     self._err.write('WARNING: variable is not static: "%s" at %s\n' % \
-                                    (var_with_type, var_decl))
-                    var_with_type = "extern " + var_with_type
+                                        (var_with_type, var_decl))
+                    var_with_type = f"extern {var_with_type}"
                     out_items = glob_data_out_items
 
                 for flt in self._filter_special_vars:
                     if flt["re"].match(var_with_type) is not None:
                         if flt["action"] == "no_section":
                             self._err.write('Don\'t put "%s" into section. Reason: %s.\n' % \
-                                            (var_with_type, flt["reason"]))
+                                                (var_with_type, flt["reason"]))
                             out_items = None
                         if flt["action"] == "ignore_extern":
                             self._err.write('Ignore extern of variable "%s". Reason: %s.\n' % \
-                                            (var_with_type, flt["reason"]))
+                                                (var_with_type, flt["reason"]))
                             out_items = data_out_items
 
-            # write output
             if self._verbose >= VERBOSE_SOME:
-                if not is_function:
-                    self._err.write('Found a variable "%s" at %s (DIE offset %s); extern: %r\n' % \
-                                    (var_with_type, var_decl, child.offset, is_extern))
-                else:
+                if is_function:
                     self._err.write('Found a function "%s" at %s (DIE offset %s); extern: %r\n' % \
-                                    (varname, var_decl, child.offset, is_extern))
+                                        (varname, var_decl, child.offset, is_extern))
+                else:
+                    self._err.write('Found a variable "%s" at %s (DIE offset %s); extern: %r\n' % \
+                                        (var_with_type, var_decl, child.offset, is_extern))
             if (not is_function) and (out_items is not None):
-                out_items.append("RTEMS_LINKER_RWSET_CONTENT(bsd_prog_%s, %s);" % \
-                        (self._progname, var_with_type))
+                out_items.append(
+                    f"RTEMS_LINKER_RWSET_CONTENT(bsd_prog_{self._progname}, {var_with_type});"
+                )
             if is_extern:
-                namesp_out_items.append("#define %s %s%s" % \
-                                 (varname, self._namespace_prefix, varname))
+                namesp_out_items.append(f"#define {varname} {self._namespace_prefix}{varname}")
 
         self._write_list_to_file(data_out_items, data_out)
         self._write_list_to_file(glob_data_out_items, glob_data_out)
@@ -480,7 +468,6 @@ class UserspaceHeaderGen:
 
 
 if __name__ == '__main__':
-    default_filter = '.*'
     default_dataout = 'rtems-bsd-#PROGNAME#-#MODULE#-data.h'
     default_globdataout = 'rtems-bsd-#PROGNAME#-data.h'
     default_namespaceout = 'rtems-bsd-#PROGNAME#-namespace.h'
@@ -495,13 +482,13 @@ if __name__ == '__main__':
         type=argparse.FileType("rb"),
         nargs='+'
     )
+    default_filter = '.*'
     parser.add_argument(
-        "-f", "--filter",
-        help="Only process variables that are defined in files with a name " \
-             "matching the given regular expression. " \
-             "Default: '%s'" % default_filter,
+        "-f",
+        "--filter",
+        help=f"Only process variables that are defined in files with a name matching the given regular expression. Default: '{default_filter}'",
         dest="filter_string",
-        default=default_filter
+        default=default_filter,
     )
     parser.add_argument(
         "-p", "--progname",
@@ -509,29 +496,25 @@ if __name__ == '__main__':
         default="MYPROG"
     )
     parser.add_argument(
-        "-d", "--dataout",
-        help="Name of the output files where the section attributes will be " \
-             "added. '#PROGNAME#' will be replaced by the program name " \
-             "(set by parameter -p). '#MODULE#' will be replaced by the "
-             "current c modules base name. " \
-             "Default: '%s'" % (default_dataout),
+        "-d",
+        "--dataout",
+        help=f"Name of the output files where the section attributes will be added. '#PROGNAME#' will be replaced by the program name (set by parameter -p). '#MODULE#' will be replaced by the current c modules base name. Default: '{default_dataout}'",
         default=default_dataout,
-        nargs="?"
+        nargs="?",
     )
     parser.add_argument(
-        "-g", "--globdataout",
-        help="Name of the output files where the section attributes for " \
-             "global variables will be added. " \
-             "Default: '%s'" % (default_globdataout),
+        "-g",
+        "--globdataout",
+        help=f"Name of the output files where the section attributes for global variables will be added. Default: '{default_globdataout}'",
         default=default_globdataout,
-        nargs="?"
+        nargs="?",
     )
     parser.add_argument(
-        "-n", "--namespaceout",
-        help="Name of the output file where namespace definitions will be " \
-             "added. Default: '%s'" % (default_namespaceout),
+        "-n",
+        "--namespaceout",
+        help=f"Name of the output file where namespace definitions will be added. Default: '{default_namespaceout}'",
         default=default_namespaceout,
-        nargs="?"
+        nargs="?",
     )
     parser.add_argument(
         "-v", "--verbose",

@@ -52,7 +52,12 @@ def getCounterSums(variant):
 	w = 1
 	y = []
 	while True:
-		c = map(m, ctx.xpathEval('/TestEpoch01/' + variant + '[@activeWorker="' + str(w) + '"]/Counter'))
+		c = map(
+			m,
+			ctx.xpathEval(
+				f'/TestEpoch01/{variant}[@activeWorker="{str(w)}"]/Counter'
+			),
+		)
 		if not c:
 			break
 		y.append(sum(c))
