@@ -84,7 +84,7 @@ def parseArguments():
                                      "verbose" ])
     except getopt.GetoptError as err:
         # print help information and exit:
-        print(str(err)) # will print something like "option -a not recognized"
+        print(err)
         usage()
         sys.exit(2)
     for o, a in opts:
@@ -125,11 +125,11 @@ print("Direction:                   %s" % (("reverse", "forward")[isForward]))
 # Check directory argument was set and exist
 def wasDirectorySet(desc, path):
     if path == "not_set":
-        print("error:" + desc + " Directory was not specified on command line")
+        print(f"error:{desc} Directory was not specified on command line")
         sys.exit(2)
 
     if os.path.isdir( path ) != True:
-        print("error:" + desc + " Directory (" + path + ") does not exist")
+        print(f"error:{desc} Directory ({path}) does not exist")
         sys.exit(2)
 
 try:
@@ -157,10 +157,10 @@ try:
     if len(dups) > 0:
         print()
         print('Duplicates: %d' % (len(dups)))
-        mods = list(set([dup[0] for dup in dups]))
+        mods = list({dup[0] for dup in dups})
         max_mod_len = max(len(dup[1]) for dup in dups)
         for mod in mods:
-            print(' %s:' % (mod))
+            print(f' {mod}:')
             for dup in [dup for dup in dups if dup[0] == mod]:
                 print('  %-*s %s %s' % (max_mod_len, dup[1], dup[3][0].upper(), dup[2]))
         print()
@@ -173,8 +173,8 @@ try:
     build.processSource(isForward)
     builder.changedFileSummary(statsReport)
 except IOError as ioe:
-    print('error: %s' % (str(ioe)))
+    print(f'error: {str(ioe)}')
 except builder.error as be:
-    print('error: %s' % (be))
+    print(f'error: {be}')
 except KeyboardInterrupt:
     print('user abort')

@@ -64,7 +64,7 @@ args = parser.parse_args()
 if args.license is not None:
     args.out.write("/*\n")
     for line in args.license:
-        args.out.write(" * " + line)
+        args.out.write(f" * {line}")
     args.out.write(" */\n")
 
 name = args.name

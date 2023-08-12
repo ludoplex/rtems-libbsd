@@ -2,6 +2,7 @@
 """LibBSD build configuration to waf integration module.
 """
 
+
 # Copyright (c) 2015, 2020 Chris Johns <chrisj@rtems.org>. All rights reserved.
 #
 # Copyright (c) 2009, 2015 embedded brains GmbH.  All rights reserved.
@@ -52,10 +53,7 @@ BUILDSET_DEFAULT = builder.BUILDSET_DEFAULT
 
 windows = os.name == 'nt'
 
-if windows:
-    host_shell = 'sh -c '
-else:
-    host_shell = ''
+host_shell = 'sh -c ' if windows else ''
 
 def _add_flags_if_not_present(current_flags, addional_flags):
     for flag in addional_flags:
@@ -80,7 +78,7 @@ class Builder(builder.ModuleManager):
                     continue
                 if cfg != 'default':
                     for c in cfg.split(' '):
-                        if not bld.env['HAVE_%s' % (c)]:
+                        if not bld.env[f'HAVE_{c}']:
                             continue
                 sources += sorted(files[cfg])
         else:
@@ -92,55 +90,53 @@ class Builder(builder.ModuleManager):
             #
             # The default handler returns None. Skip it.
             #
-            if frag is not None:
-                # Start at the top of the tree
-                d = data
-                path = frag[0]
-                if path[0] not in d:
-                    d[path[0]] = {}
-                # Select the sub-part of the tree as the compile options
-                # specialise how files are built.
-                d = d[path[0]]
-                # Group based on the space, ie kernel or user
-                if space not in d:
-                    d[space] = {}
-                d = d[space]
-                if type(path[1]) is list:
-                    p = ' '.join(path[1])
-                else:
-                    p = path[1]
-                if p not in d:
-                    d[p] = {}
-                d = d[p]
-                if cpu not in d:
-                    d[cpu] = {}
-                config = frag[0][2][0]
-                if config != 'default':
-                    if 'configure' not in data:
-                        data['configure'] = {}
-                    configTest = frag[1]['configTest']
-                    if configTest not in data['configure']:
-                        data['configure'][configTest] = {}
-                    data['configure'][configTest][config] = frag[0][2][1]
-                if type(frag[1]) is list:
-                    if config not in d[cpu]:
-                        d[cpu][config] = []
-                    d[cpu][config] += frag[1]
-                else:
-                    d[cpu][config] = frag[1]
-                #
-                # The CPU is for files and the flags and includes are common.
-                #
-                if len(frag) > 3:
-                    if 'cflags' not in d:
-                        d['cflags'] = []
-                    d['cflags'] += frag[2]
-                    d['cflags'] = list(set(d['cflags']))
-                if len(frag) >= 3 and None not in frag[-1]:
-                    if 'includes' not in d:
-                        d['includes'] = []
-                    d['includes'] += frag[-1]
-                    d['includes'] = list(set(d['includes']))
+            if frag is None:
+                return
+            # Start at the top of the tree
+            d = data
+            path = frag[0]
+            if path[0] not in d:
+                d[path[0]] = {}
+            # Select the sub-part of the tree as the compile options
+            # specialise how files are built.
+            d = d[path[0]]
+            # Group based on the space, ie kernel or user
+            if space not in d:
+                d[space] = {}
+            d = d[space]
+            p = ' '.join(path[1]) if type(path[1]) is list else path[1]
+            if p not in d:
+                d[p] = {}
+            d = d[p]
+            if cpu not in d:
+                d[cpu] = {}
+            config = frag[0][2][0]
+            if config != 'default':
+                if 'configure' not in data:
+                    data['configure'] = {}
+                configTest = frag[1]['configTest']
+                if configTest not in data['configure']:
+                    data['configure'][configTest] = {}
+                data['configure'][configTest][config] = frag[0][2][1]
+            if type(frag[1]) is list:
+                if config not in d[cpu]:
+                    d[cpu][config] = []
+                d[cpu][config] += frag[1]
+            else:
+                d[cpu][config] = frag[1]
+            #
+            # The CPU is for files and the flags and includes are common.
+            #
+            if len(frag) > 3:
+                if 'cflags' not in d:
+                    d['cflags'] = []
+                d['cflags'] += frag[2]
+                d['cflags'] = list(set(d['cflags']))
+            if len(frag) >= 3 and None not in frag[-1]:
+                if 'includes' not in d:
+                    d['includes'] = []
+                d['includes'] += frag[-1]
+                d['includes'] = list(set(d['includes']))
 
         self.generateBuild()
 
@@ -184,9 +180,9 @@ class Builder(builder.ModuleManager):
                                              fragment=rtems.test_application(),
                                              execute=False,
                                              mandatory=False):
-                                conf.env['HAVE_%s' % l.upper()] = True
+                                conf.env[f'HAVE_{l.upper()}'] = True
                     else:
-                        bld.fatal('invalid config test: %s' % (configTest))
+                        bld.fatal(f'invalid config test: {configTest}')
         section_flags = ["-fdata-sections", "-ffunction-sections"]
         _add_flags_if_not_present(conf.env.CFLAGS, section_flags)
         _add_flags_if_not_present(conf.env.CXXFLAGS, section_flags)

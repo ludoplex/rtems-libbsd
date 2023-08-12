@@ -84,7 +84,7 @@ def changedFileSummary(statsReport=False):
         if verbose():
             print('%d file(s) were changed:' % (filesProcessedCount))
             for f in sorted(filesProcessed):
-                print(' %s' % (f))
+                print(f' {f}')
         else:
             print('%d file(s) were changed.' % (filesProcessedCount))
     if statsReport:
@@ -103,7 +103,7 @@ def changedFileSummary(statsReport=False):
                                key=lambda diff: diff[1].opacity,
                                reverse=True)
         for f in ordered_diffs:
-            print('  %s' % (diffDetails[f[0]].status()))
+            print(f'  {diffDetails[f[0]].status()}')
 
 
 def readFile(name):
@@ -113,7 +113,7 @@ def readFile(name):
                                encoding='utf-8',
                                errors='ignore').read()
     except UnicodeDecodeError as ude:
-        print('error: reading: %s: %s' % (name, ude))
+        print(f'error: reading: {name}: {ude}')
         sys.exit(1)
     return contents
 
@@ -124,13 +124,13 @@ def writeFile(name, contents):
         try:
             os.makedirs(path)
         except OSError as oe:
-            print('error: cannot create directory: %s: %s' % (path, oe))
+            print(f'error: cannot create directory: {path}: {oe}')
             sys.exit(1)
     try:
         codecs.open(name, mode='w', encoding='utf-8',
                     errors='ignore').write(contents)
     except UnicodeDecodeError as ude:
-        print('error: write: %s: %s' % (name, ude))
+        print(f'error: write: {name}: {ude}')
         sys.exit(1)
 
 
@@ -140,7 +140,7 @@ def writeFile(name, contents):
 class error(Exception):
     """Base class for exceptions."""
     def __init__(self, msg):
-        self.msg = 'error: %s' % (msg)
+        self.msg = f'error: {msg}'
 
     def set_output(self, msg):
         self.msg = msg
@@ -226,21 +226,21 @@ def assertNothing(path):
 
 def assertHeaderFile(path):
     if path[-2] != '.' or path[-1] != 'h':
-        print("*** " + path + " does not end in .h")
+        print(f"*** {path} does not end in .h")
         print("*** Move it to a C source file list")
         sys.exit(2)
 
 
 def assertSourceFile(path):
     if path[-2:] != '.c' and path[-2:] != '.S' and path[-3:] != '.cc':
-        print("*** " + path + " does not end in .c, .cc or .S")
+        print(f"*** {path} does not end in .c, .cc or .S")
         print("*** Move it to a header file list")
         sys.exit(2)
 
 
 def assertHeaderOrSourceFile(path):
-    if path[-2] != '.' or (path[-1] != 'h' and path[-1] != 'c'):
-        print("*** " + path + " does not end in .h or .c")
+    if path[-2] != '.' or path[-1] not in ['h', 'c']:
+        print(f"*** {path} does not end in .h or .c")
         print("*** Move it to another list")
         sys.exit(2)
 
@@ -260,11 +260,10 @@ def diffSource(dstLines, srcLines, src, dst):
                              lineterm=''))
     inserts = 0
     deletes = 0
-    if len(diff) > 0:
+    if diff:
         if src in diffDetails and \
            diffDetails[src].dst != dst and diffDetails[src].diff != diff:
-            raise error('repeated diff of file different: src:%s dst:%s' %
-                        (src, dst))
+            raise error(f'repeated diff of file different: src:{src} dst:{dst}')
         for l in diff:
             if l[0] == '-':
                 deletes += 1
@@ -301,8 +300,7 @@ class Converter(object):
         global filesProcessed, filesProcessedCount
 
         if verbose(verboseDebug):
-            print("convert: filter:%s: %s -> %s" % \
-                  (['yes', 'no'][sourceFilter is None], src, dst))
+            print(f"convert: filter:{['yes', 'no'][sourceFilter is None]}: {src} -> {dst}")
 
         #
         # If there is no source raise an error if we expect source else print a
@@ -311,10 +309,9 @@ class Converter(object):
         if srcContents is None:
             if not os.path.exists(src):
                 if hasSource:
-                    raise error('source not found: %s' % (src))
-                else:
-                    print('warning: no source: %s' % (src))
-                    return
+                    raise error(f'source not found: {src}')
+                print(f'warning: no source: {src}')
+                return
 
             #
             # Files read as a single string if not passed in.
@@ -324,7 +321,7 @@ class Converter(object):
         if os.path.exists(dst):
             dstContents = readFile(dst)
         else:
-            print('warning: no destination: %s' % (dst))
+            print(f'warning: no destination: {dst}')
             dstContents = ''
 
         #
@@ -359,11 +356,11 @@ class Converter(object):
             filesProcessedCount += 1
             if isDiffMode == False:
                 if verbose(verboseDetail):
-                    print("UPDATE: %s -> %s" % (src, dst))
+                    print(f"UPDATE: {src} -> {dst}")
                 if isDryRun == False:
                     writeFile(dst, srcContents)
             else:
-                print("diff -u %s %s" % (src, dst))
+                print(f"diff -u {src} {dst}")
                 for l in diff:
                     print(l)
 
@@ -522,20 +519,13 @@ class TargetSourceCPUDependentPathComposer(CPUDependentFreeBSDPathComposer):
 
 class BuildSystemComposer(object):
     def __init__(self, includes=None):
-        if type(includes) is not list:
-            self.includes = [includes]
-        else:
-            self.includes = includes
+        self.includes = [includes] if type(includes) is not list else includes
 
     def __str__(self):
         return ''
 
     def getIncludes(self):
-        if None in self.includes:
-            incs = []
-        else:
-            incs = self.includes
-        return incs
+        return [] if None in self.includes else self.includes
 
     def compose(self, path):
         """A None result means there is nothing to build."""
@@ -548,22 +538,16 @@ class BuildSystemComposer(object):
             f = f.upper()
             for c in '\/-.':
                 f = f.replace(c, '_')
-            define_keys += ' ' + f
+            define_keys += f' {f}'
         return define_keys.strip()
 
     @staticmethod
     def cflagsIncludes(cflags, includes):
         if type(cflags) is not list:
-            if cflags is not None:
-                _cflags = cflags.split(' ')
-            else:
-                _cflags = [None]
+            _cflags = cflags.split(' ') if cflags is not None else [None]
         else:
             _cflags = cflags
-        if type(includes) is not list:
-            _includes = [includes]
-        else:
-            _includes = includes
+        _includes = [includes] if type(includes) is not list else includes
         return _cflags, _includes
 
 
@@ -619,7 +603,7 @@ class TestFragementComposer(BuildSystemComposer):
         self.modules = modules
 
     def __str__(self):
-        return 'TEST: ' + self.testName
+        return f'TEST: {self.testName}'
 
     def compose(self, path):
         return ['tests', self.testName, ('default', None)], {
@@ -764,10 +748,10 @@ class File(object):
         self.buildSystemComposer = buildSystemComposer
 
     def __str__(self):
-        out = self.space[0].upper() + ' ' + self.path
+        out = f'{self.space[0].upper()} {self.path}'
         bsc = str(self.buildSystemComposer)
-        if len(bsc) > 0:
-            out += ' (' + bsc + ')'
+        if bsc != "":
+            out += f' ({bsc})'
         return out
 
     def __eq__(self, other):
@@ -778,21 +762,18 @@ class File(object):
         state = state and (self.forwardConverter == self.forwardConverter)
         state = state and (self.self.reverseConverter
                            == self.self.reverseConverter)
-        state = state and (self.buildSystemComposer
-                           == self.buildSystemComposer)
-        return state
+        return state and (self.buildSystemComposer == self.buildSystemComposer)
 
     def processSource(self, forward):
         if forward:
             if verbose(verboseDetail):
-                print("process source: %s => %s" %
-                      (self.originPath, self.libbsdPath))
+                print(f"process source: {self.originPath} => {self.libbsdPath}")
             self.forwardConverter.convert(self.originPath, self.libbsdPath)
         else:
             if verbose(verboseDetail):
-                print("process source: %s => %s converter:%s" % \
-                      (self.libbsdPath, self.originPath,
-                       self.reverseConverter.__class__.__name__))
+                print(
+                    f"process source: {self.libbsdPath} => {self.originPath} converter:{self.reverseConverter.__class__.__name__}"
+                )
             self.reverseConverter.convert(self.libbsdPath, self.originPath)
 
     def getFragment(self):
@@ -816,10 +797,10 @@ class Module(object):
         self.dependencies = []
 
     def __str__(self):
-        out = [self.name + ':']
+        out = [f'{self.name}:']
         if len(self.dependencies) > 0:
-            out += [' Deps: ' + str(len(self.dependencies))]
-            out += ['  ' + type(d).__name__ for d in self.dependencies]
+            out += [f' Deps: {len(self.dependencies)}']
+            out += [f'  {type(d).__name__}' for d in self.dependencies]
         if len(self.files) > 0:
             counts = {}
             for f in self.files:
@@ -827,19 +808,18 @@ class Module(object):
                 if space not in counts:
                     counts[space] = 0
                 counts[space] += 1
-            count_str = ''
-            for space in sorted(counts.keys()):
-                count_str += '%s:%d ' % (space[0].upper(), counts[space])
+            count_str = ''.join(
+                '%s:%d ' % (space[0].upper(), counts[space])
+                for space in sorted(counts.keys())
+            )
             count_str = count_str[:-1]
             out += [' Files: %d (%s)' % (len(self.files), count_str)]
-            out += ['  ' + str(f) for f in self.files]
+            out += [f'  {str(f)}' for f in self.files]
         if len(self.cpuDependentSourceFiles) > 0:
-            out += [' CPU Dep: ' + str(len(self.cpuDependentSourceFiles))]
+            out += [f' CPU Dep: {len(self.cpuDependentSourceFiles)}']
             for cpu in self.cpuDependentSourceFiles:
-                out += ['  ' + cpu + ':']
-                out += [
-                    '   ' + str(f) for f in self.cpuDependentSourceFiles[cpu]
-                ]
+                out += [f'  {cpu}:']
+                out += [f'   {str(f)}' for f in self.cpuDependentSourceFiles[cpu]]
         return os.linesep.join(out)
 
     def initCPUDependencies(self, cpu):
@@ -850,11 +830,11 @@ class Module(object):
         return self.name
 
     def getFiles(self):
-        return (f for f in self.files)
+        return iter(self.files)
 
     def processSource(self, direction):
         if verbose(verboseDetail):
-            print("process module: %s" % (self.name))
+            print(f"process module: {self.name}")
         for f in self.files:
             f.processSource(direction)
         for cpu, files in self.cpuDependentSourceFiles.items():
@@ -863,7 +843,7 @@ class Module(object):
 
     def addFile(self, f):
         if not isinstance(f, File):
-            raise TypeError('invalid type for addFiles: %s' % (type(f)))
+            raise TypeError(f'invalid type for addFiles: {type(f)}')
         self.files += [f]
 
     def addFiles(self,
@@ -1005,7 +985,7 @@ class Module(object):
 
     def addDependency(self, dep):
         if not isinstance(dep, str):
-            raise TypeError('dependencies are a string: %s' % (self.name))
+            raise TypeError(f'dependencies are a string: {self.name}')
         self.dependencies += [dep]
 
 
@@ -1019,25 +999,24 @@ class ModuleManager(object):
 
     def __getitem__(self, key):
         if key not in self.modules:
-            raise KeyError('module %s not found' % (key))
+            raise KeyError(f'module {key} not found')
         return self.modules[key]
 
     def __str__(self):
-        out = ['Modules: ' + str(len(self.modules)), '']
+        out = [f'Modules: {len(self.modules)}', '']
         for m in sorted(self.modules):
             out += [str(self.modules[m]), '']
         return os.linesep.join(out)
 
     def _loadIni(self, ini_file):
         if not os.path.exists(ini_file):
-            raise FileNotFoundError('file not found: %s' % (ini_file))
+            raise FileNotFoundError(f'file not found: {ini_file}')
         ini = configparser.ConfigParser()
         ini.read(ini_file)
         if not ini.has_section('general'):
-            raise Exception(
-                "'{}' is missing a general section.".format(ini_file))
+            raise Exception(f"'{ini_file}' is missing a general section.")
         if not ini.has_option('general', 'name'):
-            raise Exception("'{}' is missing a general/name.".format(ini_file))
+            raise Exception(f"'{ini_file}' is missing a general/name.")
         if ini.has_option('general', 'extends'):
             extends = ini.get('general', 'extends')
             extendfile = None
@@ -1048,8 +1027,8 @@ class ModuleManager(object):
                 extendfile = os.path.join(BUILDSET_DIR, extends)
             else:
                 raise Exception(
-                    "'{}': Invalid file given for general/extends:'{}'".format(
-                        ini_file, extends))
+                    f"'{ini_file}': Invalid file given for general/extends:'{extends}'"
+                )
             base = self._loadIni(extendfile)
             for s in ini.sections():
                 if not base.has_section(s):
@@ -1066,14 +1045,13 @@ class ModuleManager(object):
             enabled_modules.remove('tests')
         for mod in enabled_modules:
             if mod not in self.modules:
-                raise KeyError('enabled module not found: %s' % (mod))
+                raise KeyError(f'enabled module not found: {mod}')
             for dep in self.modules[mod].dependencies:
                 if dep not in self.modules:
                     print(type(dep))
-                    raise KeyError('dependent module not found: %s' % (dep))
+                    raise KeyError(f'dependent module not found: {dep}')
                 if dep not in enabled_modules:
-                    raise Exception('module "%s" dependency "%s" not enabled' %
-                                    (mod, dep))
+                    raise Exception(f'module "{mod}" dependency "{dep}" not enabled')
 
     def getAllModules(self):
         if 'modules' in self.configuration:
@@ -1118,7 +1096,7 @@ class ModuleManager(object):
             modules_to_process = self.getAllModules()
         for m in modules_to_process:
             if m not in self.modules:
-                raise KeyError('enabled module not registered: %s' % (m))
+                raise KeyError(f'enabled module not registered: {m}')
             self.modules[m].generate()
         self._checkDependencies()
 
@@ -1129,7 +1107,7 @@ class ModuleManager(object):
             mod = modules_to_check.pop()
             for m in modules_to_check:
                 if m not in self.modules:
-                    raise KeyError('enabled module not registered: %s' % (m))
+                    raise KeyError(f'enabled module not registered: {m}')
                 for fmod in self.modules[mod].getFiles():
                     for fm in self.modules[m].getFiles():
                         if fmod.getPath() == fm.getPath():
@@ -1138,14 +1116,13 @@ class ModuleManager(object):
 
     def loadConfig(self, config=BUILDSET_DEFAULT):
         if 'name' in self.configuration:
-            raise KeyError('configuration already loaded: %s (%s)' % \
-                           (self.configuration['name'], config))
+            raise KeyError(
+                f"configuration already loaded: {self.configuration['name']} ({config})"
+            )
         ini = self._loadIni(config)
         self.configuration['name'] = ini.get('general', 'name')
         self.configuration['modules-enabled'] = []
-        mods = []
-        if ini.has_section('modules'):
-            mods = ini.options('modules')
+        mods = ini.options('modules') if ini.has_section('modules') else []
         for mod in mods:
             if ini.getboolean('modules', mod):
                 self.configuration['modules-enabled'].append(mod)
